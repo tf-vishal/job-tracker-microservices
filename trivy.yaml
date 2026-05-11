@@ -1,0 +1,10 @@
+scan:
+  skip-dirs:
+    - "node_modules"
+    - "vendor"
+    - "**/.terraform"
+    - "learning/*"
+  skip-files:
+    - "**/*.log"
+    - "**/test/**"
+    - "**/Gemfile.lock"
