@@ -1,0 +1,277 @@
+version: '3.9'
+
+# ─── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  job-tracker-network:
+    driver: bridge
+
+# ─── Volumes (persistent DB storage) ─────────────────────────────────────────
+volumes:
+  auth-db-data:
+  job-db-data:
+  resume-db-data:
+  notification-db-data:
+
+# ─── Services ─────────────────────────────────────────────────────────────────
+services:
+
+  # ── PostgreSQL: Auth DB ──────────────────────────────────────────────────────
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: postgres-auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       auth_db
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── PostgreSQL: Job DB ───────────────────────────────────────────────────────
+  postgres-job:
+    image: postgres:16-alpine
+    container_name: postgres-job
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       job_db
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - job-db-data:/var/lib/postgresql/data
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d job_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── PostgreSQL: Resume DB ────────────────────────────────────────────────────
+  postgres-resume:
+    image: postgres:16-alpine
+    container_name: postgres-resume
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       resume_db
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - resume-db-data:/var/lib/postgresql/data
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d resume_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── PostgreSQL: Notification DB ──────────────────────────────────────────────
+  postgres-notification:
+    image: postgres:16-alpine
+    container_name: postgres-notification
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       notification_db
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - notification-db-data:/var/lib/postgresql/data
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notification_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Auth Service ─────────────────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV:             production
+      PORT:                 3001
+      DB_HOST:              postgres-auth
+      DB_PORT:              5432
+      DB_NAME:              auth_db
+      DB_USER:              postgres
+      DB_PASSWORD:          ${POSTGRES_PASSWORD:-postgres}
+      JWT_SECRET:           ${JWT_SECRET:-dev-jwt-secret-change-in-prod}
+      JWT_REFRESH_SECRET:   ${JWT_REFRESH_SECRET:-dev-refresh-secret-change-in-prod}
+      JWT_ACCESS_EXPIRES_IN:  15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      ALLOWED_ORIGINS:      ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Job Service ──────────────────────────────────────────────────────────────
+  job-service:
+    build:
+      context: ./job-service
+      dockerfile: Dockerfile
+    container_name: job-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV:         production
+      PORT:             3002
+      DB_HOST:          postgres-job
+      DB_PORT:          5432
+      DB_NAME:          job_db
+      DB_USER:          postgres
+      DB_PASSWORD:      ${POSTGRES_PASSWORD:-postgres}
+      SERVICE_API_KEY:  ${SERVICE_API_KEY:-internal-service-secret-key}
+      ALLOWED_ORIGINS:  ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
+    depends_on:
+      postgres-job:
+        condition: service_healthy
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Resume Service ───────────────────────────────────────────────────────────
+  resume-service:
+    build:
+      context: ./resume-service
+      dockerfile: Dockerfile
+    container_name: resume-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV:        production
+      PORT:            3003
+      DB_HOST:         postgres-resume
+      DB_PORT:         5432
+      DB_NAME:         resume_db
+      DB_USER:         postgres
+      DB_PASSWORD:     ${POSTGRES_PASSWORD:-postgres}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
+    depends_on:
+      postgres-resume:
+        condition: service_healthy
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3003/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Notification Service ─────────────────────────────────────────────────────
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV:         production
+      PORT:             3004
+      DB_HOST:          postgres-notification
+      DB_PORT:          5432
+      DB_NAME:          notification_db
+      DB_USER:          postgres
+      DB_PASSWORD:      ${POSTGRES_PASSWORD:-postgres}
+      JOB_SERVICE_URL:  http://job-service:3002
+      SERVICE_API_KEY:  ${SERVICE_API_KEY:-internal-service-secret-key}
+      CRON_SCHEDULE:    ${CRON_SCHEDULE:-0 * * * *}
+      ALLOWED_ORIGINS:  ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      job-service:
+        condition: service_healthy
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3004/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── API Gateway ──────────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    environment:
+      NODE_ENV:                    production
+      PORT:                        8080
+      JWT_SECRET:                  ${JWT_SECRET:-dev-jwt-secret-change-in-prod}
+      AUTH_SERVICE_URL:            http://auth-service:3001
+      JOB_SERVICE_URL:             http://job-service:3002
+      RESUME_SERVICE_URL:          http://resume-service:3003
+      NOTIFICATION_SERVICE_URL:    http://notification-service:3004
+      ALLOWED_ORIGINS:             ${ALLOWED_ORIGINS:-http://localhost:3000}
+      RATE_LIMIT_WINDOW_MS:        60000
+      RATE_LIMIT_MAX:              100
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      job-service:
+        condition: service_healthy
+      resume-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 25s
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - job-tracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

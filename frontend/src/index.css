@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* ─── Design Tokens (Tailwind v4 @theme) ────────────────────────────────────── */
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg-primary:   #080b12;
+  --color-bg-card:      #0f1422;
+  --color-bg-elevated:  #161d30;
+  --color-bg-input:     #1a2035;
+
+  --color-border-subtle:  rgba(255,255,255,0.05);
+  --color-border-default: rgba(255,255,255,0.10);
+  --color-border-focus:   rgba(99,102,241,0.6);
+
+  --color-accent:         #6366f1;
+  --color-accent-hover:   #818cf8;
+  --color-accent-glow:    rgba(99,102,241,0.25);
+  --color-accent-subtle:  rgba(99,102,241,0.12);
+
+  --color-success:        #10b981;
+  --color-success-bg:     rgba(16,185,129,0.12);
+  --color-warning:        #f59e0b;
+  --color-warning-bg:     rgba(245,158,11,0.12);
+  --color-error:          #ef4444;
+  --color-error-bg:       rgba(239,68,68,0.12);
+  --color-info:           #3b82f6;
+  --color-info-bg:        rgba(59,130,246,0.12);
+  --color-purple:         #8b5cf6;
+  --color-purple-bg:      rgba(139,92,246,0.12);
+
+  --color-text-primary:   #e2e8f0;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted:     #475569;
+}
+
+/* ─── Base Styles ────────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 999px; }
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+@layer utilities {
+  @keyframes fade-in       { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slide-up      { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes slide-in-right{ from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes slide-out-right{ to  { opacity: 0; transform: translateX(20px); } }
+  @keyframes spin          { to { transform: rotate(360deg); } }
+
+  .animate-fade-in        { animation: fade-in 0.15s ease; }
+  .animate-slide-up       { animation: slide-up 0.2s ease; }
+  .animate-slide-in-right { animation: slide-in-right 0.25s ease; }
+  .animate-slide-out-right{ animation: slide-out-right 0.2s ease forwards; }
+  .animate-spin-custom    { animation: spin 0.7s linear infinite; }
+}
+
+/* ─── Gradient Text Utility ──────────────────────────────────────────────────── */
+@layer utilities {
+  .gradient-text {
+    background: linear-gradient(135deg, #fff, var(--color-accent-hover));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .accent-glow {
+    box-shadow: 0 0 24px var(--color-accent-glow);
+  }
+}
